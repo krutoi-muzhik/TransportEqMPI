@@ -1,6 +1,6 @@
 CC = mpicc
 CRUN = mpirun
-NTHREADS = 4
+NTHREADS = 1
 RUNOPTS = -np $(NTHREADS)
 TARGET = corner
 CLIB = -lm
@@ -12,7 +12,7 @@ all: compile run
 
 compile: $(TARGET)
 
-$(TARGET): $(TARGET).c $(TARGET.h)
+$(TARGET): $(TARGET).c $(TARGET).h
 	$(CC) $< -o $@ $(CLIB)
 
 run: $(TARGET)

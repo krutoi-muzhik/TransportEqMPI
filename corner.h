@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define NX 20
-#define NT 20
-#define L 1
+#define NX 100
+#define NT 100
+#define L 10
 #define T 1
 
 // typedef struct {

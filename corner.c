@@ -36,16 +36,6 @@ int main (int argc, char **argv) {
 		.commsize = commsize
 	};
 
-	// rank = 0;
-	// commsize = 1;
-
-
-	printf("info init\n");
-
-	
-
-	printf("calc start\n");
-
 	Calc(&info);
 
 	Dump("dump.txt", &info);
@@ -77,17 +67,18 @@ double func_left_edge (double t) {
 
 void Calc (calc_info_t *info) {
 	MPI_Status status;
-	printf("left = %d\n", info->left);
-	printf("right = %d\n", info->right);
+	// printf ("left = %d\n", info->left);
+	// printf ("right = %d\n", info->right);
+
 
 	if (info->rank == 0) {
 		for (int t = 0; t < info->top; t ++) {
-			info->arr[0][t] = func_left_edge(t);
+			info->arr[0][t] = func_left_edge(t * info->tau);
 		}
 	}
 
 	for (int x = info->left; x <= info->right; x ++) {
-		info->arr[x][0] = func_bottom(x);
+		info->arr[x][0] = func_bottom(x * info->h);
 	}
 
 	for (int t = 0; t < info->top - 1; t ++) {
@@ -97,7 +88,9 @@ void Calc (calc_info_t *info) {
 			MPI_Send(&(info->arr[info->right][t]), 1, MPI_DOUBLE, info->rank + 1, info->rank, MPI_COMM_WORLD);
 		if (info->rank == 0) {
 			for (int x = info->left + 1; x <= info->right; x ++) {
-				info->arr[x][t + 1] = info->tau * func(x, t) + ((double) 1 - info->tau / info->h) * info->arr[x][t] + (info->tau / info->h) * info->arr[x - 1][t];
+				info->arr[x][t + 1] = info->tau * func(x * info->h, t * info->tau) + ((double) 1 - info->tau / info->h) * info->arr[x][t] + (info->tau / info->h) * info->arr[x - 1][t];
+				// printf("2 = %lf\n", ((double) 1 - info->tau / info->h));
+				// printf("3 = %lf\n", (info->tau / info->h));
 			}
 		} else {
 			for (int x = info->left; x <= info->right; x ++) {
@@ -112,7 +105,6 @@ void Calc (calc_info_t *info) {
 
 
 void Dump (const char *pathname, calc_info_t *info) {
-	printf("dump\n");
 	MPI_Status status;
 	if (info->rank == 0) {
 		FILE *out;
@@ -128,7 +120,7 @@ void Dump (const char *pathname, calc_info_t *info) {
 		}
 
 		out = fopen(pathname, "w+");
-		for (int t = 0; t < info->top; t ++) {
+		for (int t = 0; t <= info->top; t ++) {
 			for (int x = info->left; x <= info->right; x ++) {
 				fprintf(out, "%.3lf  ", info->arr[x][t]);
 			}
