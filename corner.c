@@ -5,40 +5,58 @@ int main (int argc, char **argv) {
 	int rank, commsize, len, time;
 	int x, t, nx, nt;
 	double tau, h;
-	calc_info_t info;
+	double 	**arr;
+
+	len = L;
+	time = T;
+	nx = NX;
+	nt = NT;
+
+	arr = (double **) calloc(NX, sizeof(double *));
+	for (int i = 0; i < NT; i ++) {
+		arr[i] = (double *) calloc(NT, sizeof(double));
+	}
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &commsize);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	calc_info_t info = {
+		.arr = arr,
+		.len = L,
+		.time = T,
+		.nx = NX,
+		.nt = NT,
+		.left = rank * (nt / commsize),
+		.right = (rank + 1) * (nt / commsize) - 1,
+		.top = NT - 1,
+		.h = (double) len / nx,
+		.tau = (double) time / nt,
+		.rank = rank,
+		.commsize = commsize
+	};
 
 	// rank = 0;
 	// commsize = 1;
 
-	// MPI_Init(&argc, &argv);
-	// MPI_Comm_size(MPI_COMM_WORLD, &commsize);
-	// MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 	printf("info init\n");
 
-	// info = {
-	// 	.len = L,
-	// 	.time = T,
-	// 	.nx = NX,
-	// 	.nt = NT,
-	// 	.left = rank * (nt / commsize),
-	// 	.right = (rank + 1) * (nt / commsize) - 1,
-	// 	.top = time - 1,
-	// 	.h = (double) len / nx,
-	// 	.tau = (double) time / nt,
-	// 	.rank = rank,
-	// 	.commsize = commsize
-	// };
+	
 
 	printf("calc start\n");
 
-	// Calc(&info);
+	Calc(&info);
 
-	printf("dump start\n");
+	Dump("dump.txt", &info);
 
-	// Dump("dump.txt", &info);
 
-	// MPI_Finalize();
+	for (int i = 0; i < NT; i ++) {
+		free(arr[i]);
+	}
+	free(arr);
+
+	MPI_Finalize();
 	return 0;
 }
 
@@ -58,7 +76,7 @@ double func_left_edge (double t) {
 
 
 void Calc (calc_info_t *info) {
-	// MPI_Status status;
+	MPI_Status status;
 	printf("left = %d\n", info->left);
 	printf("right = %d\n", info->right);
 
@@ -73,13 +91,19 @@ void Calc (calc_info_t *info) {
 	}
 
 	for (int t = 0; t < info->top - 1; t ++) {
-		if (info->rank != 0)
-			// MPI_Recv(&(info->arr[info->left - 1][t]), 1, MPI_DOUBLE, info->rank - 1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+		if (info->rank != 0) 
+			MPI_Recv(&(info->arr[info->left - 1][t]), 1, MPI_DOUBLE, info->rank - 1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 		if (info->rank < info->commsize - 1)
-			// MPI_Send(&(info->arr[info->right][t]), 1, MPI_DOUBLE, info->rank + 1, info->rank, MPI_COMM_WORLD);
+			MPI_Send(&(info->arr[info->right][t]), 1, MPI_DOUBLE, info->rank + 1, info->rank, MPI_COMM_WORLD);
+		if (info->rank == 0) {
+			for (int x = info->left + 1; x <= info->right; x ++) {
+				info->arr[x][t + 1] = info->tau * func(x, t) + ((double) 1 - info->tau / info->h) * info->arr[x][t] + (info->tau / info->h) * info->arr[x - 1][t];
+			}
+		} else {
+			for (int x = info->left; x <= info->right; x ++) {
+				info->arr[x][t + 1] = info->tau * func(x, t) + ((double) 1 - info->tau / info->h) * info->arr[x][t] + (info->tau / info->h) * info->arr[x - 1][t];
+			}
 
-		for (int x = info->left; x <= info->right; x ++) {
-			info->arr[x][t + 1] = info->tau * func(x, t) + ((double) 1 - info->tau / info->h) * info->arr[x][t] + (info->tau / info->h) * info->arr[x - 1][t];
 		}
 	}
 
@@ -88,19 +112,19 @@ void Calc (calc_info_t *info) {
 
 
 void Dump (const char *pathname, calc_info_t *info) {
-	// MPI_Status status;
-
+	printf("dump\n");
+	MPI_Status status;
 	if (info->rank == 0) {
 		FILE *out;
+		int left, right;
 		for (int i = 1; i < info->commsize; i ++) {
-			calc_info_t recv_info;
-			// MPI_Recv(&recv_info, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-			for (int x = recv_info.left; x <= recv_info.right; x ++) {
-				for (int t = 0; t < recv_info.top; t ++) {
-					info->arr[x][t] = recv_info.arr[x][t];
-				}
+			MPI_Recv(&left, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			MPI_Recv(&right, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+			for (int x = left; x <= right; x ++) {
+				MPI_Recv(info->arr[x], info->top, MPI_DOUBLE, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 			}
-			info->right = recv_info.right;
+			info->right =right;
 		}
 
 		out = fopen(pathname, "w+");
@@ -113,7 +137,12 @@ void Dump (const char *pathname, calc_info_t *info) {
 		fclose(out);
 
 	} else {
-		// MPI_Send(info, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD);
+		MPI_Send(&(info->left), 1, MPI_INT, 0, info->rank, MPI_COMM_WORLD);
+		MPI_Send(&(info->right), 1, MPI_INT, 0, info->rank, MPI_COMM_WORLD);
+
+		for (int i = info->left; i <= info->right; i ++) {
+			MPI_Send(info->arr[i], info->top, MPI_DOUBLE, 0, info->rank, MPI_COMM_WORLD);
+		}
 	}
 
 	return;

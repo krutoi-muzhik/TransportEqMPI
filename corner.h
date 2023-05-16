@@ -1,12 +1,12 @@
-// #include <mpi.h>
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-#define NX 2000
-#define NT 2000
+#define NX 20
+#define NT 20
 #define L 1
-#define T 1000
+#define T 1
 
 // typedef struct {
 // 	int size;
@@ -15,7 +15,7 @@
 // } arr_t;
 
 typedef struct {
-	double 	arr[NX][NT];												// ????????????????
+	double 	**arr;												// ????????????????
 	int 	len;
 	int 	time;
 	int 	nx;
