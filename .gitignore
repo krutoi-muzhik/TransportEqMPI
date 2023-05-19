@@ -1,0 +1,17 @@
+#Executables
+
+corner
+
+#Tests
+
+test
+test.c
+
+#Dependencies
+
+*.d
+
+#Objects
+
+*.o
+
